@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -5,43 +7,55 @@ import 'package:scan/app%20service/connexion.dart';
 import 'package:scan/app%20service/loginservice.dart';
 import 'package:scan/app%20service/soundservice.dart';
 import 'package:http/http.dart' as http;
-import 'package:scan/homepage.dart';
+import 'package:scan/classes/etudiant.dart';
+import 'package:scan/classes/examen.dart';
+import 'package:scan/scannedetudiant.dart';
 
-class ScannerWidget extends StatefulWidget {
-  const ScannerWidget({Key? key}) : super(key: key);
+// ignore: must_be_immutable
+class CarteScanner extends StatefulWidget {
+  Examen examen;
+  // ignore: use_key_in_widget_constructors
+  CarteScanner(this.examen);
 
   @override
-  createState() => _ScannerWidgetState();
+  createState() => _CarteScannerState();
 }
 
-class _ScannerWidgetState extends State<ScannerWidget> {
+class _CarteScannerState extends State<CarteScanner> {
   bool scanned = false;
   int ifTokenIsValidated = 0;
   MobileScannerController cameraController = MobileScannerController();
+  String? token;
 
-  _validateToken(String token) async {
+  _scnneEtudiantCarte(String codeAppoge) async {
     Connexion connexion = Connexion();
-    http.Response response =
-        await connexion.getData("examensurveillance/$token/validatetoken");
-    if (kDebugMode) {
-      print("********************  ${response.body}  *********************");
-    }
-    if (response.body == "token is valid.") {
-      LoginService loginService = LoginService();
-      bool test = await loginService.setToken(token);
-      if (test) {
-        // ignore: use_build_context_synchronously
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage()),
-        );
-      } else {
-        // ignore: use_build_context_synchronously
-        Navigator.pop(context);
+    token = await LoginService().getToken();
+    if (token != null) {
+      http.Response response = await connexion
+          .getData("examensurveillance/$token/scanneetudiantcarte/$codeAppoge");
+      if (kDebugMode) {
+        print("******************  ${response.body}  **************");
       }
-    } else {
+      dynamic asMap = jsonDecode(response.body);
+      Examen? anExamen;
+      if (asMap['examen'] != null) {
+        anExamen = Examen.fromMap(asMap['examen']);
+      }
+      bool isNotTheSameExamen = false;
+      if (anExamen == null || anExamen.id != widget.examen!.id) {
+        isNotTheSameExamen = true;
+      }
       // ignore: use_build_context_synchronously
-      Navigator.pop(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => ScannedEtudiant(
+                Etudiant.fromMap(asMap['etudiant']),
+                token!,
+                asMap['already_scanned'],
+                isNotTheSameExamen,
+                anExamen)),
+      );
     }
   }
 
@@ -96,7 +110,7 @@ class _ScannerWidgetState extends State<ScannerWidget> {
                 } else {
                   SoundService.playLocalSound("audios/beep.mp3");
                   final String code = barcode.rawValue!;
-                  _validateToken(code);
+                  _scnneEtudiantCarte(code);
                   if (kDebugMode) {
                     print("********************  $code  *********************");
                   }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -5,43 +6,35 @@ import 'package:scan/app%20service/connexion.dart';
 import 'package:scan/app%20service/loginservice.dart';
 import 'package:scan/app%20service/soundservice.dart';
 import 'package:http/http.dart' as http;
-import 'package:scan/homepage.dart';
+import 'package:scan/classes/etudiant.dart';
+import 'package:scan/classes/examen.dart';
+import 'package:scan/scannedetudiant.dart';
 
-class ScannerWidget extends StatefulWidget {
-  const ScannerWidget({Key? key}) : super(key: key);
+// ignore: must_be_immutable
+class ExamenPaperScanner extends StatefulWidget {
+  Examen examen;
+  // ignore: use_key_in_widget_constructors
+  ExamenPaperScanner(this.examen);
 
   @override
-  createState() => _ScannerWidgetState();
+  createState() => _ExamenPaperScannerState();
 }
 
-class _ScannerWidgetState extends State<ScannerWidget> {
+class _ExamenPaperScannerState extends State<ExamenPaperScanner> {
   bool scanned = false;
   int ifTokenIsValidated = 0;
   MobileScannerController cameraController = MobileScannerController();
+  String? token;
 
-  _validateToken(String token) async {
+  _scnneEtudiantCarte(String paper_token) async {
     Connexion connexion = Connexion();
-    http.Response response =
-        await connexion.getData("examensurveillance/$token/validatetoken");
-    if (kDebugMode) {
-      print("********************  ${response.body}  *********************");
-    }
-    if (response.body == "token is valid.") {
-      LoginService loginService = LoginService();
-      bool test = await loginService.setToken(token);
-      if (test) {
-        // ignore: use_build_context_synchronously
-        Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => HomePage()),
-            (route) => false);
-      } else {
-        // ignore: use_build_context_synchronously
-        Navigator.pop(context);
+    token = await LoginService().getToken();
+    if (token != null) {
+      http.Response response = await connexion
+          .getData("examensurveillance/$token/scanneexamenpaper/$paper_token");
+      if (kDebugMode) {
+        print("******************  ${response.body}  **************");
       }
-    } else {
-      // ignore: use_build_context_synchronously
-      Navigator.pop(context);
     }
   }
 
@@ -92,13 +85,11 @@ class _ScannerWidgetState extends State<ScannerWidget> {
               if (!scanned) {
                 scanned = true;
                 if (barcode.rawValue == null) {
-                  if (kDebugMode) {
-                    print('Failed to scan Barcode');
-                  }
+                  debugPrint('Failed to scan Barcode');
                 } else {
                   SoundService.playLocalSound("audios/beep.mp3");
                   final String code = barcode.rawValue!;
-                  _validateToken(code);
+                  _scnneEtudiantCarte(code);
                   if (kDebugMode) {
                     print("********************  $code  *********************");
                   }
